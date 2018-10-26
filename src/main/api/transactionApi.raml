@@ -1,0 +1,75 @@
+#%RAML 1.0 
+
+# User Strory Description
+title: To get all transaction for an account with status as pending
+
+version: v1
+# Endpoint URI protocol used HTTPS
+
+protocols: [HTTPS]
+baseUri: https://mocksvc.mulesoft.com/mocks/f5e3627e-89d4-42ae-8265-aa2ae6ace05b/api/v1/dda # baseUri: /api/v1/dda
+
+mediaType: application/json
+
+# externilised entity in entityApi.raml
+uses: 
+  library: entityApi.raml
+
+# securitySchemes used oAuth2
+securitySchemes: 
+  oauth2_0: !include transactionSecurityScheme.raml
+
+# Endpoint URI to get transactions for Account status as Pending
+/account/{accountId}/transaction/{status}:
+ securedBy: oauth2_0
+ get:      
+  responses: 
+    200:
+     body: 
+       application/json:
+        type: library.Transaction[]
+        example: !include transactionExample.raml
+         
+    
+  
+    400:
+     body: 
+       application/json:
+        type: library.Error
+        example:
+         { 
+            "code" : "400",
+            "message" : "Invalid Parameters",  
+          }
+
+    401:
+     body: 
+       application/json:
+        type: library.Error
+        example:
+         {
+            "code" : "401",
+           "message" : "You are not authorized"  
+         } 
+    404:
+     body: 
+       application/json:
+         type: library.Error 
+         example: 
+          { 
+            "code" : "404",
+            "message" : "Account Not found" 
+          }
+
+    405:
+     body: 
+       application/json:
+         type: library.Error
+         example:
+          {
+            "code" : "405",
+           "message" : "Method Not Allowed"
+           
+         }
+          
+          

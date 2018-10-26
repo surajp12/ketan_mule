@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:amqp="http://www.mulesoft.org/schema/mule/amqp" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/amqp http://www.mulesoft.org/schema/mule/amqp/current/mule-amqp.xsd">
+	<apikit:config name="transactionApi-config" raml="transactionApi.raml" consoleEnabled="false" doc:name="Router"/>
+    <context:property-placeholder location="transaction-${env}.properties"/>
+    <http:listener-config name="HTTP_Listener_Configuration1" host="0.0.0.0" port="${http.port}" doc:name="HTTP Listener Configuration"/>
+    <amqp:connector name="AMQP_0_9_Connector" validateConnections="true" host="clam.rmq.cloudamqp.com" virtualHost="cffynywg" username="cffynywg" password="2wBBWC3WikKPN2XwMCk72ZgXo_Y56LT1" doc:name="AMQP-0-9 Connector"/>
+   <!--  <catch-exception-strategy name="Catch_Exception_Strategy">
+        <set-payload value="#[exception.message]" doc:name="Set Payload"/>
+        <set-property propertyName="http.status" value="400" doc:name="Property"/>
+        <logger level="INFO" doc:name="Logger"/>
+    </catch-exception-strategy> -->
+    
+    <!-- <choice-exception-strategy name="globalChoice_Exception_Strategy">
+        <catch-exception-strategy when="#[exception.causedBy(org.mule.extension.validation.api.ValidationException)]" doc:name="Bad request Exception Strategy">
+            <set-payload value="#[exception.message]" doc:name="Set Payload"/>
+            <set-property propertyName="http.status" value="400" doc:name="Property"/>
+            <logger level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+        
+        <catch-exception-strategy when="#[exception.causedBy(java.util.NoSuchElementException)]" doc:name=" Not Found Exception Strategy">
+            <set-payload value="#[exception.message]" doc:name="Set Payload"/>
+            <set-property propertyName="http.status" value="404" doc:name="Property"/>
+            <logger level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+        
+       <catch-exception-strategy  doc:name="Method Not Allowed Exception Strategy" when="#[exception.causedBy(org.mule.module.apikit.exception.MethodNotAllowedException)]">
+       
+            <set-payload value="Method not allowed" doc:name="Set Payload"/> 
+            <set-property propertyName="http.status" value="405" doc:name="Property"/>
+            <logger level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+       
+        <catch-exception-strategy  doc:name="Not Acceptable Exception Strategy" when="#[exception.causedBy(org.mule.module.apikit.exception.NotAcceptableException)]">
+            
+            <set-payload value="Not acceptable" doc:name="Set Payload"/> 
+            <set-property propertyName="http.status" value="406" doc:name="Property"/>
+            <logger level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+        
+        
+        <catch-exception-strategy  doc:name="Unsupported MediaType Exception Strategy" when="#[exception.causedBy(org.mule.module.apikit.exception.UnsupportedMediaTypeException)]">
+           
+           <set-payload value="Unsupported media type" doc:name="Set Payload"/> 
+            <set-property propertyName="http.status" value="415" doc:name="Property"/>
+            <logger level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+        
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+        
+            <set-payload value="Internal Server Error" doc:name="Set Payload"/> 
+            <set-property propertyName="http.status" value="500" doc:name="Property"/>
+            <logger level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+    </choice-exception-strategy> 
+     -->
+
+	 <choice-exception-strategy name="globalChoice_Exception_Strategy">
+        <catch-exception-strategy when="#[exception.causedBy(org.mule.extension.validation.api.ValidationException)]" doc:name="Bad request Exception Strategy">
+            <set-payload value="{&quot;code&quot;:400, &quot;message&quot;: &quot;#[exception.message]&quot; }" doc:name="Set Payload"/>
+            <set-property propertyName="http.status" value="400" doc:name="Property"/>
+            <!-- <set-property propertyName="Content-Type" value="application/json" doc:name="Property"/>
+             <set-payload value="{ &quot;message&quot;: &quot;#[exception.message]&quot; }" doc:name="Set Payload"/> -->
+            <logger level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+        
+        <catch-exception-strategy when="#[exception.causedBy(java.util.NoSuchElementException)]" doc:name=" Not Found Exception Strategy">
+            <set-payload value="{ &quot;code&quot;:404, &quot;message&quot;: &quot;#[exception.message]&quot; }" doc:name="Set Payload"/>
+            <set-property propertyName="http.status" value="404" doc:name="Property"/> 
+            <logger level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+        
+       <catch-exception-strategy  doc:name="Method Not Allowed Exception Strategy" when="#[exception.causedBy(org.mule.module.apikit.exception.MethodNotAllowedException)]">
+            <set-payload value="{ &quot;code&quot;:405, &quot;message&quot;: &quot;Method not allowed&quot; }" doc:name="Set Payload"/>
+            <set-property propertyName="http.status" value="405" doc:name="Property"/>
+          <!--   <set-payload value="Method not allowed" doc:name="Set Payload"/>
+            <set-property propertyName="http.status" value="405" doc:name="Property"/> -->
+          
+            <logger level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+               
+        <catch-exception-strategy  doc:name="NotAcceptable Exception Strategy" when="#[exception.causedBy(org.mule.module.apikit.exception.NotAcceptableException)]">
+             <set-payload value="{&quot;code&quot;:406,  &quot;message&quot;: &quot;Not acceptable&quot; }" doc:name="Set Payload"/>
+            <set-property propertyName="http.status" value="406" doc:name="Property"/>
+ 
+          <!--   <set-property propertyName="Content-Type" value="application/json" doc:name="Property"/>
+            <set-payload value="{ &quot;message&quot;: &quot;Not acceptable&quot; }" doc:name="Set Payload"/> -->
+            <logger level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>       
+               
+          <catch-exception-strategy  doc:name="Unsupported media Exception Strategy" when="#[exception.causedBy(org.mule.module.apikit.exception.UnsupportedMediaTypeException)]">
+            <set-payload value="{ &quot;message&quot;: &quot;Unsupported media type&quot; }" doc:name="Set Payload"/>
+            <set-property propertyName="http.status" value="415" doc:name="Property"/>
+ 
+            <!-- <set-property propertyName="Content-Type" value="application/json" doc:name="Property"/>
+            <set-payload value="{ &quot;message&quot;: &quot;Unsupported media type&quot; }" doc:name="Set Payload"/> -->
+            <logger level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>          
+               
+               
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+              <set-payload value="{ &quot;code&quot;:500, &quot;message&quot;: &quot;Internal Server Error&quot; }" doc:name="Set Payload"/>
+            <set-property propertyName="http.status" value="500" doc:name="Property"/>
+             <!-- <set-payload value="{ &quot;message&quot;: &quot;#[exception.message]&quot; }" doc:name="Set Payload"/>   -->
+            <logger level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+        
+        
+    </choice-exception-strategy> 
+
+
+
+</mule>

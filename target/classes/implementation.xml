@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ws="http://www.mulesoft.org/schema/mule/ws"
+	xmlns:amqp="http://www.mulesoft.org/schema/mule/amqp" xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ws http://www.mulesoft.org/schema/mule/ws/current/mule-ws.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/amqp http://www.mulesoft.org/schema/mule/amqp/current/mule-amqp.xsd">
+    <http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"/>
+    <db:mysql-config name="MySQL_Configuration" host="${db.host}" port="${db.port}" user="${db.user}" password="${db.password}" database="${db.database}" doc:name="MySQL Configuration"/>
+    <validation:config name="Validation_Configuration" doc:name="Validation Configuration"/>
+    <ws:consumer-config name="Web_Service_Consumer" wsdlLocation="bankdetails.wsdl.xml" service="BankDetailPortService" port="BankDetailPortSoap11" serviceAddress="http://34.236.109.151:8000/ws" doc:name="Web Service Consumer"/>
+    <flow name="getTransactionsByIDFlow">
+        <validation:all config-ref="Validation_Configuration" doc:name="Validation">
+            <validation:validations>
+                <validation:matches-regex value="#[flowVars.accountId]" regex="[0-9]{10}" message="Account Not Found...Please Enter Valid Account Id"/>
+                <validation:matches-regex value="#[flowVars.status]" regex="\bPENDING|pending\b" caseSensitive="true" message="Please Check Your Status..(Status Should be PENDING)"/>
+            </validation:validations>
+        </validation:all>
+        <db:select config-ref="MySQL_Configuration" doc:name="Database">
+            <db:parameterized-query><![CDATA[select asd.AccountId,asd.AccountDescriptorId,asd.CustomerId,tra.TransactionId,
+tra.ReferenceTransactionId,tra.TransactionTimestamp,tra.Amount,tra.Description,tra.Status
+from accountdescriptor asd, transaction tra where asd.AccountId=tra.AccountId and tra.AccountId=#[flowVars.AccountId] and tra.Status=#[flowVars.Status]]]></db:parameterized-query>
+        </db:select>
+        <validation:is-not-empty config-ref="Validation_Configuration" message="Account Not Found" exceptionClass="java.util.NoSuchElementException" value="#[payload]" doc:name="Validation"/>
+        <dw:transform-message doc:name="Transform Message" metadata:id="e6584834-7f21-4e2c-90d5-ae032e8e35a1">
+            <dw:input-payload doc:sample="sample_data\list_map_2.dwl"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+
+        <scatter-gather doc:name="Scatter-Gather">
+            <custom-aggregation-strategy class="CustomAggregation"/>
+
+            <flow-ref name="ampqFlow" doc:name="ampqFlow"/>
+            <processor-chain>
+                <logger level="INFO" doc:name="Logger"/>
+                <json:object-to-json-transformer doc:name="Object to JSON"/>
+                <flow-ref name="postmanFlow" doc:name="postmanFlow"/>
+            </processor-chain>
+            <flow-ref name="SoapConsumeFlow" doc:name="SoapConsumeFlow"/>
+          <!--   <flow-ref name="SoapConsumeFlow" doc:name="SoapConsumeFlow"/> -->
+        </scatter-gather>
+        <logger level="INFO" doc:name="Logger"/>
+        <exception-strategy ref="globalChoice_Exception_Strategy" doc:name="Reference Exception Strategy"/>
+       
+    </flow>
+    <flow name="ampqFlow">
+        <object-to-string-transformer doc:name="Object to String"/>
+
+        <amqp:outbound-endpoint queueName="transactions" responseTimeout="10000" exchange-pattern="request-response" doc:name="AMQP-0-9"/>
+        <logger level="INFO" doc:name="Logger"/>
+    </flow>
+    <flow name="postmanFlow">
+        <logger level="INFO" doc:name="Logger"/>
+    </flow>
+ 
+ 
+ <flow name="SoapConsumeFlow">
+        <set-variable variableName="CustomerId" value="#[payload[0].CustomerId]" doc:name="Variable"/>
+		<dw:transform-message doc:name="Transform Message">
+            <dw:input-variable doc:sample="sample_data\map_string_string.dwl" variableName="customerId"/>
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace ns0 http://bank-web-service
+---
+{
+	ns0#getBankDetailsRequest: {
+		ns0#customerId: flowVars.CustomerId
+	}
+}]]> 
+</dw:set-payload>
+		</dw:transform-message>
+        <ws:consumer config-ref="Web_Service_Consumer" operation="getBankDetails" doc:name="Web Service Consumer"/>
+
+		<dw:transform-message doc:name="Transform Message">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload]]></dw:set-payload>
+		</dw:transform-message>
+		<logger level="INFO" doc:name="Logger" />
+	</flow> 
+   
+    
+    
+    
+    
+</mule>
